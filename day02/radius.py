@@ -1,4 +1,4 @@
 import math
-radius = int(input("input radius:"))
+radius = 5
 print("area =",2*(math.pi)*radius,"circumference =",
       (math.pi)*radius**2, sep = " ")
