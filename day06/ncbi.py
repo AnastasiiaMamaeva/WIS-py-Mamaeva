@@ -1,103 +1,54 @@
-import argparse
-import requests
-from datetime import datetime
-from openpyxl import Workbook, load_workbook
 
-# Define NCBI API base URLs
-SEARCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi"
-FETCH_URL = "https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi"
+def get_input():
+    if len(sys.argv) < 2:
+        print("please tipe: python ncbi.py  `--database protein --term TERM --number NUMBER` \n or at least `python ncbi.py --term TERM`")
+        sys.exit(1)
+    parsed = {}
+    for i in ["--database", "--term","--number"]:
+        if i in sys.argv:
+            parsed[i] = sys.argv[sys.argv.index(i) +1]
+        if ("--database" not in parsed.keys()):
+            parsed["--database"] = "protein"
+        if ("--number" not in parsed.keys()):
+            parsed["--number"] = 1
+    return parsed
 
-def search_ncbi(database, term, max_results):
-    """Search the NCBI database and return a list of IDs and total count."""
-    params = {
-        "db": database,
-        "term": term,
-        "retmax": max_results,
-        "retmode": "json"
-    }
-    response = requests.get(SEARCH_URL, params=params)
-    response.raise_for_status()
-    data = response.json()
-    ids = data.get("esearchresult", {}).get("idlist", [])
-    total_count = int(data.get("esearchresult", {}).get("count", 0))
-    return ids, total_count
+def get_id_and_rec(db, term, max):
+    handle = Entrez.esearch(db=db, term=term)  # Set retmax=0 to avoid fetching IDs
+    record = Entrez.read(handle)
+    handle.close()
+    total = int(record["Count"])
+    ids  = record["IdList"][:max]
+    return ids, total
 
-def fetch_ncbi_item(database, item_id):
-    """Fetch an item from the NCBI database by its ID."""
-    params = {
-        "db": database,
-        "id": item_id,
-        "rettype": "gb",
-        "retmode": "text"
-    }
-    response = requests.get(FETCH_URL, params=params)
-    response.raise_for_status()
-    return response.text
 
-def save_log_to_excel(log_file, date, database, term, max_results, total_found):
-    """Save log data to an Excel file."""
-    try:
-        # Load workbook if it exists, otherwise create a new one
-        try:
-            workbook = load_workbook(log_file)
-            sheet = workbook.active
-        except FileNotFoundError:
-            workbook = Workbook()
-            sheet = workbook.active
-            # Write headers if the workbook is new
-            sheet.append(["date", "database", "term", "max", "total"])
+def get_data(db, ids):
 
-        # Append the log entry
-        sheet.append([date, database, term, max_results, total_found])
-        workbook.save(log_file)
-    except Exception as e:
-        print(f"Error saving log to Excel: {e}")
+    handle = Entrez.efetch(db=db, id=",".join(ids), rettype="fasta", retmode="text")
+    data = handle.read()
+    handle.close()
+    return data
 
-def main():
-    # Define command-line arguments
-    parser = argparse.ArgumentParser(description="Download data from NCBI.")
-    parser.add_argument("--database", default="nucleotide", help="NCBI database to search (default: nucleotide)")
-    parser.add_argument("--term", required=True, help="Search term")
-    parser.add_argument("--number", default=10, type=int, help="Number of items to download (default: 10)")
-    parser.add_argument("--logfile", default="ncbi_log.xlsx", help="Log file to store metadata (default: ncbi_log.xlsx)")
 
-    args = parser.parse_args()
-    database = args.database
-    term = args.term
-    max_results = args.number
-    log_file = args.logfile
-
-    # Perform search
-    print(f"Searching {database} for '{term}'...")
-    try:
-        ids, total_found = search_ncbi(database, term, max_results)
-    except Exception as e:
-        print(f"Error during search: {e}")
-        return
-
-    # Download items
-    print(f"Found {total_found} items. Downloading up to {max_results} items...")
-    downloaded_files = []
-    for idx, item_id in enumerate(ids):
-        try:
-            data = fetch_ncbi_item(database, item_id)
-            filename = f"{term.replace(' ', '_')}_{idx + 1}.txt"
-            with open(filename, "w") as file:
-                file.write(data)
-            downloaded_files.append(filename)
-        except Exception as e:
-            print(f"Error downloading item {item_id}: {e}")
-            continue
-
-    # Print downloaded files
-    print("Downloaded files:")
-    for file in downloaded_files:
-        print(f"- {file}")
-
-    # Save metadata to the Excel log
-    current_date = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    save_log_to_excel(log_file, current_date, database, term, max_results, total_found)
-    print(f"Metadata saved in '{log_file}'.")
+def save_data(filename, data):
+    with open(filename, 'w') as fh:
+        fh.write(data)
 
 if __name__ == "__main__":
-    main()
+    import sys
+    from Bio import Entrez
+    import datetime
+    import numpy as np
+    
+    Entrez.email = "mamaeva.anastas@gmail.com"
+    
+    parsed = get_input()
+    term = parsed["--term"]
+    max = parsed["--number"]
+    db = parsed["--database"]
+    
+    ids, total = get_id_and_rec(db, term, max)
+    for it in ids:
+        data = get_data(db, it)
+        save_data("_".join(it, "fasta"),data)
+    print(datetime.datetime.now(),term,max,total)
