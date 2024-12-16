@@ -1,4 +1,3 @@
-
 def get_input():
     if len(sys.argv) < 2:
         print("please tipe: python ncbi.py  `--database protein --term TERM --number NUMBER` \n or at least `python ncbi.py --term TERM`")
@@ -38,17 +37,20 @@ if __name__ == "__main__":
     import sys
     from Bio import Entrez
     import datetime
-    import numpy as np
     
     Entrez.email = "mamaeva.anastas@gmail.com"
     
     parsed = get_input()
     term = parsed["--term"]
-    max = parsed["--number"]
+    max = int(parsed["--number"])
     db = parsed["--database"]
     
     ids, total = get_id_and_rec(db, term, max)
+    f_names = []
     for it in ids:
-        data = get_data(db, it)
-        save_data("_".join(it, "fasta"),data)
-    print(datetime.datetime.now(),term,max,total)
+        f_name = it+ ".fasta"
+        f_names.append(f_name)
+        data = get_data(db, [it])
+        save_data(f_name,data)
+    print(datetime.datetime.now(),term,max,total, sep = ",")
+    print(f"file names:{f_names}")
