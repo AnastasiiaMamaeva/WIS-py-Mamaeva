@@ -33,6 +33,20 @@ def save_data(filename, data):
     with open(filename, 'w') as fh:
         fh.write(data)
 
+def save_to_csv(csv_file, date, db, term, number, total):
+    import csv
+
+    try:
+        with open(csv_file, 'x') as f:
+            writer = csv.writer(f)
+            writer.writerow(["Date", "Database", "Search Term", "Number Requested", "Total Found"])
+    except FileExistsError:
+        pass
+
+    with open(csv_file, 'a') as f:
+        writer = csv.writer(f)
+        writer.writerow([date, db, term, number, total])
+
 if __name__ == "__main__":
     import sys
     from Bio import Entrez
@@ -52,5 +66,10 @@ if __name__ == "__main__":
         f_names.append(f_name)
         data = get_data(db, [it])
         save_data(f_name,data)
+
+    csv_filename = "search_history.csv"
+    current_date = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    save_to_csv(csv_filename, current_date, db, term, max, total)
+
     print(datetime.datetime.now(),term,max,total, sep = ",")
     print(f"file names:{f_names}")
